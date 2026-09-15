@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>棚割り確認用アプリ JANコード登録 Ver.0.9.1</title>
+    <title>棚割り確認用アプリ JANコード登録 Ver.0.9.2</title>
     <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest"></script>
     <style>
         body {
@@ -32,7 +32,6 @@
             border-radius: 4px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
-        /* カメラウィンドウの高さを 160px から 200px に気持ち大きく拡大 */
         .video-container {
             position: relative;
             width: 100%;
@@ -128,7 +127,7 @@
 </head>
 <body>
 
-    <h1>棚割り確認用アプリ JANコード登録 Ver.0.9.1</h1>
+    <h1>棚割り確認用アプリ JANコード登録 Ver.0.9.2</h1>
 
     <div class="container">
         <!-- カメラ＆スキャン / キャプチャ画像表示エリア -->
@@ -166,12 +165,18 @@
                     </div>
                     <div class="form-group">
                         <label>段数:</label>
+                        <!-- 段数を1〜10段に変更 -->
                         <select id="shelf">
                             <option value="1" selected>1段</option>
                             <option value="2">2段</option>
                             <option value="3">3段</option>
                             <option value="4">4段</option>
                             <option value="5">5段</option>
+                            <option value="6">6段</option>
+                            <option value="7">7段</option>
+                            <option value="8">8段</option>
+                            <option value="9">9段</option>
+                            <option value="10">10段</option>
                         </select>
                     </div>
                 </div>
@@ -227,7 +232,6 @@
                 await codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
                     if (result) {
                         if (!janInput.value) {
-                            // 実際のカメラ解像度を取得してキャンバスに正しく描画
                             const videoWidth = videoElement.videoWidth || 640;
                             const videoHeight = videoElement.videoHeight || 480;
                             
@@ -241,7 +245,7 @@
 
                             if (navigator.vibrate) navigator.vibrate(100);
 
-                            // ラグを1秒（1000ミリ秒）に変更してJAN確定
+                            // 1秒のラグを持たせてJAN確定
                             setTimeout(() => {
                                 janInput.value = result.text;
                                 codeReader.reset();
@@ -272,7 +276,7 @@
 
         document.getElementById('jan-clear-btn').addEventListener('click', () => {
             janInput.value = '';
-            faceSelect.value = '1';
+            // ※フェースは前回の値をそのまま保持するためリセットしない仕様に変更
             canvasElement.style.display = 'none';
             videoElement.style.display = 'block';
             if (!isScanning) {
@@ -294,8 +298,8 @@
             scannedData.push({ jan, face, shelf });
             updateLog();
 
+            // JANのみクリアし、フェースの選択値は次へ引き継ぐためそのまま維持
             janInput.value = '';
-            faceSelect.value = '1';
             
             canvasElement.style.display = 'none';
             videoElement.style.display = 'block';
