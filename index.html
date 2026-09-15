@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>棚割り確認用アプリ JANコード登録 Ver.0.95</title>
+    <!-- タイトルのバージョンを Ver.0.8.1 に変更 -->
+    <title>棚割り確認用アプリ JANコード登録 Ver.0.8.1</title>
     <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest"></script>
     <style>
         body {
@@ -32,10 +33,10 @@
             border-radius: 4px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
-        /* カメラ映像をさらにコンパクトにして、スクロールを完全になくす */
+        /* カメラ映像を大きくした状態 (160px) */
         video {
             width: 100%;
-            height: 90px;
+            height: 160px;
             object-fit: cover;
             border-radius: 4px;
             background: #000;
@@ -97,7 +98,8 @@
 </head>
 <body>
 
-    <h1>棚割り確認用アプリ JANコード登録 Ver.0.95</h1>
+    <!-- 画面上のタイトルも連動して Ver.0.8.1 に変更 -->
+    <h1>棚割り確認用アプリ JANコード登録 Ver.0.8.1</h1>
 
     <div class="container">
         <!-- カメラ＆スキャン -->
@@ -206,14 +208,14 @@
             scannedData.push({ jan, face, shelf });
             updateLog();
 
-            // ★ここがポイント：登録ボタンを押した瞬間に入力欄からフォーカスを外し、キーボードを強制的に閉じる
+            // 登録ボタンを押した瞬間にキーボードを閉じる
             document.activeElement.blur();
 
-            // リセットしてカメラ画面が見える位置に視点を戻す
+            // リセット
             janInput.value = '';
             faceInput.value = '';
             
-            // 画面の一番上（カメラ部分）にスクロールを強制的に戻す
+            // カメラ画面がしっかり見える位置にスクロールを戻す
             window.scrollTo({ top: 0, behavior: 'smooth' });
         });
 
