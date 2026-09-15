@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>棚割り確認用アプリ JANコード登録 Ver.0.8.3</title>
+    <title>棚割り確認用アプリ JANコード登録 Ver.0.8.4</title>
     <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest"></script>
     <style>
         body {
@@ -32,13 +32,26 @@
             border-radius: 4px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
-        video {
+        /* カメラ映像およびキャプチャ表示用 */
+        .video-container {
+            position: relative;
             width: 100%;
             height: 160px;
-            object-fit: cover;
-            border-radius: 4px;
             background: #000;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        video, canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
             display: block;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: none; /* 読み取り時にキャプチャ画像を表示するため初期は非表示 */
         }
         button {
             padding: 6px;
@@ -74,13 +87,23 @@
             font-size: 0.75rem;
             margin-bottom: 1px;
         }
-        input[type="text"], input[type="number"] {
+        input[type="text"] {
             width: 100%;
             padding: 4px;
             box-sizing: border-box;
             font-size: 0.95rem;
             border: 1px solid #ccc;
             border-radius: 4px;
+        }
+        /* キーボードを出さないためのセレクトボックス（ドロップダウン）デザイン */
+        select {
+            width: 100%;
+            padding: 5px;
+            box-sizing: border-box;
+            font-size: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background-color: #fff;
         }
         .status-area {
             display: flex;
@@ -101,12 +124,15 @@
 </head>
 <body>
 
-    <h1>棚割り確認用アプリ JANコード登録 Ver.0.8.3</h1>
+    <h1>棚割り確認用アプリ JANコード登録 Ver.0.8.4</h1>
 
     <div class="container">
-        <!-- カメラ＆スキャン -->
+        <!-- カメラ＆スキャン / キャプチャ画像表示エリア -->
         <div class="card" id="camera-card">
-            <video id="video" autoplay muted playsinline></video>
+            <div class="video-container">
+                <video id="video" autoplay muted playsinline></video>
+                <canvas id="snapshot"></canvas>
+            </div>
             <button id="start-btn" class="btn-blue">カメラ起動 / スキャン開始</button>
         </div>
 
@@ -121,11 +147,30 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>フェース:</label>
-                        <input type="number" id="face" placeholder="" min="1">
+                        <!-- キーボードが出ないドロップダウン（1〜10まで選択可能） -->
+                        <select id="face">
+                            <option value="1" selected>1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                            <option value="9">9</option>
+                            <option value="10">10</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>段数:</label>
-                        <input type="number" id="shelf" value="1" min="1" required>
+                        <!-- キーボードが出ないドロップダウン（1〜5まで選択可能） -->
+                        <select id="shelf">
+                            <option value="1" selected>1段</option>
+                            <option value="2">2段</option>
+                            <option value="3">3段</option>
+                            <option value="4">4段</option>
+                            <option value="5">5段</option>
+                        </select>
                     </div>
                 </div>
 
@@ -157,10 +202,12 @@
             codeReader = new ZXing.BrowserBarcodeReader();
         });
 
+        const videoElement = document.getElementById('video');
+        const canvasElement = document.getElementById('snapshot');
         const startBtn = document.getElementById('start-btn');
         const janInput = document.getElementById('jan');
-        const faceInput = document.getElementById('face');
-        const shelfInput = document.getElementById('shelf');
+        const faceSelect = document.getElementById('face');
+        const shelfSelect = document.getElementById('shelf');
         const form = document.getElementById('entry-form');
         const logDiv = document.getElementById('log');
         const countSpan = document.getElementById('count');
@@ -168,24 +215,36 @@
         // スキャン処理の関数
         async function startScanning() {
             if (!codeReader) return;
+            
+            // 再開時はスナップショットを隠して動画を表示
+            canvasElement.style.display = 'none';
+            videoElement.style.display = 'block';
+
             try {
                 isScanning = true;
                 startBtn.textContent = "スキャン停止";
                 
                 await codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
                     if (result) {
-                        // すでにJANが入っている場合は、上書きせずにスキャンをストップ（ロックする）
                         if (!janInput.value) {
-                            janInput.value = result.text;
+                            // 1. 読み取った瞬間に映像をcanvasにキャプチャして静止画として表示（ラグ演出＋確認用）
+                            const context = canvasElement.getContext('2d');
+                            canvasElement.width = videoElement.videoWidth || 300;
+                            canvasElement.height = videoElement.videoHeight || 150;
+                            context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+                            
+                            videoElement.style.display = 'none';
+                            canvasElement.style.display = 'block';
+
                             if (navigator.vibrate) navigator.vibrate(100);
-                            
-                            // 読み取ったら自動でスキャンを一時停止してJANを固定
-                            codeReader.reset();
-                            isScanning = false;
-                            startBtn.textContent = "カメラ再開 / スキャン開始";
-                            
-                            // フェースにフォーカス
-                            faceInput.focus();
+
+                            // 2. 約0.6秒の「ラグ（余韻）」を持たせてからJANを確定してストップ
+                            setTimeout(() => {
+                                janInput.value = result.text;
+                                codeReader.reset();
+                                isScanning = false;
+                                startBtn.textContent = "カメラ再開 / スキャン開始";
+                            }, 600);
                         }
                     }
                 });
@@ -202,17 +261,20 @@
                 codeReader.reset();
                 isScanning = false;
                 startBtn.textContent = "カメラ起動 / スキャン開始";
+                canvasElement.style.display = 'none';
+                videoElement.style.display = 'block';
             } else {
                 startScanning();
             }
         });
 
-        // JANクリアボタン（赤いボックス）
+        // JANクリアボタン
         document.getElementById('jan-clear-btn').addEventListener('click', () => {
             janInput.value = '';
-            faceInput.value = '';
-            janInput.focus();
-            // スキャンが止まっていたら再開できるようにする
+            faceSelect.value = '1';
+            // スナップショットを消してカメラを復帰
+            canvasElement.style.display = 'none';
+            videoElement.style.display = 'block';
             if (!isScanning) {
                 startScanning();
             }
@@ -222,8 +284,8 @@
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             const jan = janInput.value.trim();
-            const face = faceInput.value.trim() === '' ? '1' : faceInput.value.trim();
-            const shelf = shelfInput.value;
+            const face = faceSelect.value;
+            const shelf = shelfSelect.value;
 
             if (!jan) {
                 alert("JANコードを入力してください。");
@@ -233,17 +295,16 @@
             scannedData.push({ jan, face, shelf });
             updateLog();
 
-            // キーボードを閉じる
-            document.activeElement.blur();
-
             // リセット
             janInput.value = '';
-            faceInput.value = '';
+            faceSelect.value = '1';
             
-            // 画面上部に戻す
+            // スナップショットを消してカメラを復帰し、一番上へ
+            canvasElement.style.display = 'none';
+            videoElement.style.display = 'block';
             window.scrollTo({ top: 0, behavior: 'smooth' });
 
-            // 次の読み取りのために自動でスキャンを再開する
+            // 次の読み取りのためにスキャンを自動再開
             setTimeout(() => {
                 startScanning();
             }, 300);
