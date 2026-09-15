@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>棚割り確認用アプリ JANコード登録 Ver.0.8</title>
-    <!-- バーコード読み取り用ライブラリ (ZXing) -->
     <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest"></script>
     <style>
         body {
@@ -20,7 +19,6 @@
             text-align: center;
             margin: 4px 0 8px 0;
         }
-        /* コンパクト化のためのレイアウト */
         .container {
             display: flex;
             flex-direction: column;
@@ -33,11 +31,6 @@
             padding: 10px;
             border-radius: 6px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        /* カメラ映像をコンパクトに制限 */
-        .camera-box {
-            position: relative;
-            text-align: center;
         }
         video {
             width: 100%;
@@ -60,7 +53,7 @@
             cursor: pointer;
         }
         button.success { background-color: #28a745; margin-top: 4px; }
-        button.danger { background-color: #dc3545; padding: 4px; font-size: 0.8rem; margin-top: 4px; }
+        button.danger { background-color: #dc3545; padding: 4px; font-size: 0.8rem; margin-top: 4px; width: 80px; }
         
         .form-row {
             display: flex;
@@ -99,10 +92,6 @@
             padding: 4px;
             border-radius: 4px;
         }
-        .action-row {
-            display: flex;
-            gap: 6px;
-        }
     </style>
 </head>
 <body>
@@ -116,7 +105,7 @@
             <button id="start-btn">カメラ起動 / スキャン開始</button>
         </div>
 
-        <!-- 入力フォーム（カメラの直下に配置） -->
+        <!-- 入力フォーム -->
         <div class="card">
             <form id="entry-form">
                 <div>
@@ -127,12 +116,10 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>フェース:</label>
-                        <!-- 初期値なし(空欄) -->
-                        <input type="number" id="face" placeholder="" min="1" required>
+                        <input type="number" id="face" placeholder="" min="1">
                     </div>
                     <div class="form-group">
                         <label>段数:</label>
-                        <!-- 段数は1をデフォルトにしつつ変更可能 -->
                         <input type="number" id="shelf" value="1" min="1" required>
                     </div>
                 </div>
@@ -145,7 +132,7 @@
         <div class="card" style="padding: 8px;">
             <div class="status-area">
                 <span>蓄積データ: <b id="count">0</b>件</span>
-                <button type="button" id="clear-btn" class="danger" style="width: auto; width: 80px;">クリア</button>
+                <button type="button" id="clear-btn" class="danger">クリア</button>
             </div>
             <div class="log-area" id="log">まだデータがありません</div>
             <button id="export-btn" style="background-color: #17a2b8; margin-top: 6px;">CSVファイルを保存する</button>
@@ -153,11 +140,14 @@
     </div>
 
     <script>
-        let codeReader = new ZXing.BrowserBarcodeReader();
+        let codeReader;
         let scannedData = [];
         let isScanning = false;
 
-        const videoElement = document.getElementById('video');
+        window.addEventListener('load', () => {
+            codeReader = new ZXing.BrowserBarcodeReader();
+        });
+
         const startBtn = document.getElementById('start-btn');
         const janInput = document.getElementById('jan');
         const faceInput = document.getElementById('face');
@@ -167,7 +157,12 @@
         const countSpan = document.getElementById('count');
 
         // カメラ起動＆スキャン
-        startBtn.addEventListener('click', () => {
+        startBtn.addEventListener('click', async () => {
+            if (!codeReader) {
+                alert("ライブラリの読み込み中です。少し待ってから再度お試しください。");
+                return;
+            }
+
             if (isScanning) {
                 codeReader.reset();
                 isScanning = false;
@@ -175,44 +170,46 @@
                 return;
             }
 
-            codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
-                if (result) {
-                    janInput.value = result.text;
-                    // バイブレーション
-                    if (navigator.vibrate) navigator.vibrate(100);
-                    // JANを読み込んだらフェース入力欄にフォーカスをあわせる
-                    faceInput.focus();
-                }
-            }).then(() => {
+            try {
                 isScanning = true;
                 startBtn.textContent = "スキャン停止";
-            }).catch(err => {
+                
+                await codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
+                    if (result) {
+                        janInput.value = result.text;
+                        if (navigator.vibrate) navigator.vibrate(100);
+                        faceInput.focus();
+                    }
+                });
+            } catch (err) {
                 console.error(err);
-                alert("カメラの起動に失敗しました。権限を確認してください。");
-            });
+                isScanning = false;
+                startBtn.textContent = "カメラ起動 / スキャン開始";
+                alert("カメラを起動できませんでした。ブラウザのカメラ権限（アクセス許可）を確認してください。");
+            }
         });
 
         // データ追加
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             const jan = janInput.value.trim();
-            const face = faceInput.value;
+            const face = faceInput.value.trim() === '' ? '1' : faceInput.value.trim(); // 空欄ならデフォルト1にするなど柔軟に
             const shelf = shelfInput.value;
 
-            if (!jan || !face) return;
+            if (!jan) {
+                alert("JANコードを入力してください。");
+                return;
+            }
 
             scannedData.push({ jan, face, shelf });
             updateLog();
 
-            // 登録したらJANコードとフェースを空欄にして、次へ備える
+            // リセット
             janInput.value = '';
             faceInput.value = '';
-            // 段数は連続して同じ段数を登録することが多いためそのまま、必要なら変更してもらう
-            
             janInput.focus();
         });
 
-        // ログ更新
         function updateLog() {
             countSpan.textContent = scannedData.length;
             if (scannedData.length === 0) {
@@ -227,7 +224,6 @@
             logDiv.scrollTop = logDiv.scrollHeight;
         }
 
-        // CSV保存
         document.getElementById('export-btn').addEventListener('click', () => {
             if (scannedData.length === 0) {
                 alert("保存するデータがありません。");
@@ -253,8 +249,6 @@
             document.body.removeChild(a);
         });
 
-        // クリア
-        document.getElementById('clear-btn').デザイン = ... // styleはHTML内
         document.getElementById('clear-btn').addEventListener('click', () => {
             if (confirm("蓄積したデータをすべて削除しますか？")) {
                 scannedData = [];
