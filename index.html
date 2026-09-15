@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>棚割り確認用アプリ JANコード登録 Ver.0.9.2</title>
+    <title>棚割り確認用アプリ JANコード登録 Ver.1.0.1</title>
     <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest"></script>
     <style>
         body {
@@ -101,12 +101,13 @@
         }
         select {
             width: 100%;
-            padding: 5px;
+            padding: 5px 2px;
             box-sizing: border-box;
-            font-size: 1rem;
+            font-size: 0.9rem;
             border: 1px solid #ccc;
             border-radius: 4px;
             background-color: #fff;
+            text-align: center;
         }
         .status-area {
             display: flex;
@@ -127,7 +128,7 @@
 </head>
 <body>
 
-    <h1>棚割り確認用アプリ JANコード登録 Ver.0.9.2</h1>
+    <h1>棚割り確認用アプリ JANコード登録 Ver.1.0.1</h1>
 
     <div class="container">
         <!-- カメラ＆スキャン / キャプチャ画像表示エリア -->
@@ -147,6 +148,7 @@
                     <input type="text" id="jan" placeholder="バーコード読取 or 手入力" required>
                 </div>
                 
+                <!-- フェース・段数・台目を3つ並べる -->
                 <div class="form-row">
                     <div class="form-group">
                         <label>フェース:</label>
@@ -165,7 +167,6 @@
                     </div>
                     <div class="form-group">
                         <label>段数:</label>
-                        <!-- 段数を1〜10段に変更 -->
                         <select id="shelf">
                             <option value="1" selected>1段</option>
                             <option value="2">2段</option>
@@ -177,6 +178,21 @@
                             <option value="8">8段</option>
                             <option value="9">9段</option>
                             <option value="10">10段</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>台目:</label>
+                        <select id="daime">
+                            <option value="1" selected>1台目</option>
+                            <option value="2">2台目</option>
+                            <option value="3">3台目</option>
+                            <option value="4">4台目</option>
+                            <option value="5">5台目</option>
+                            <option value="6">6台目</option>
+                            <option value="7">7台目</option>
+                            <option value="8">8台目</option>
+                            <option value="9">9台目</option>
+                            <option value="10">10台目</option>
                         </select>
                     </div>
                 </div>
@@ -214,6 +230,7 @@
         const janInput = document.getElementById('jan');
         const faceSelect = document.getElementById('face');
         const shelfSelect = document.getElementById('shelf');
+        const daimeSelect = document.getElementById('daime');
         const form = document.getElementById('entry-form');
         const logDiv = document.getElementById('log');
         const countSpan = document.getElementById('count');
@@ -276,7 +293,7 @@
 
         document.getElementById('jan-clear-btn').addEventListener('click', () => {
             janInput.value = '';
-            // ※フェースは前回の値をそのまま保持するためリセットしない仕様に変更
+            // フェース、段数、台目は前回の値をそのまま保持
             canvasElement.style.display = 'none';
             videoElement.style.display = 'block';
             if (!isScanning) {
@@ -289,16 +306,17 @@
             const jan = janInput.value.trim();
             const face = faceSelect.value;
             const shelf = shelfSelect.value;
+            const daime = daimeSelect.value;
 
             if (!jan) {
                 alert("JANコードを入力してください。");
                 return;
             }
 
-            scannedData.push({ jan, face, shelf });
+            scannedData.push({ jan, face, shelf, daime });
             updateLog();
 
-            // JANのみクリアし、フェースの選択値は次へ引き継ぐためそのまま維持
+            // JANのみクリアし、フェース・段数・台目の値は維持
             janInput.value = '';
             
             canvasElement.style.display = 'none';
@@ -318,7 +336,7 @@
             }
             let html = "";
             scannedData.forEach((item, index) => {
-                html += `${index + 1}: [JAN:${item.jan}] F:${item.face} / 段:${item.shelf}<br>`;
+                html += `${index + 1}: [JAN:${item.jan}] F:${item.face} / 段:${item.shelf} / ${item.daime}台目<br>`;
             });
             logDiv.innerHTML = html;
             logDiv.scrollTop = logDiv.scrollHeight;
@@ -330,9 +348,10 @@
                 return;
             }
 
-            let csvContent = '\uFEFFJANコード,フェース,段数\n';
+            // CSVのヘッダーに台目を追加
+            let csvContent = '\uFEFFJANコード,フェース,段数,台目\n';
             scannedData.forEach(item => {
-                csvContent += `"${item.jan}",${item.face},${item.shelf}\n`;
+                csvContent += `"${item.jan}",${item.face},${item.shelf},${item.daime}\n`;
             });
 
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
