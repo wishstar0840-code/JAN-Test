@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>棚割り確認用アプリ JANコード登録 Ver.0.9.0</title>
+    <title>棚割り確認用アプリ JANコード登録 Ver.0.9.1</title>
     <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest"></script>
     <style>
         body {
@@ -32,11 +32,11 @@
             border-radius: 4px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
-        /* カメラ映像およびキャプチャ表示用（ズレ防止のためcontainに変更して全体を表示） */
+        /* カメラウィンドウの高さを 160px から 200px に気持ち大きく拡大 */
         .video-container {
             position: relative;
             width: 100%;
-            height: 160px;
+            height: 200px;
             background: #000;
             border-radius: 4px;
             overflow: hidden;
@@ -128,7 +128,7 @@
 </head>
 <body>
 
-    <h1>棚割り確認用アプリ JANコード登録 Ver.0.9.0</h1>
+    <h1>棚割り確認用アプリ JANコード登録 Ver.0.9.1</h1>
 
     <div class="container">
         <!-- カメラ＆スキャン / キャプチャ画像表示エリア -->
@@ -241,13 +241,13 @@
 
                             if (navigator.vibrate) navigator.vibrate(100);
 
-                            // ラグを持たせてからJAN確定
+                            // ラグを1秒（1000ミリ秒）に変更してJAN確定
                             setTimeout(() => {
                                 janInput.value = result.text;
                                 codeReader.reset();
                                 isScanning = false;
                                 startBtn.textContent = "カメラ再開 / スキャン開始";
-                            }, 600);
+                            }, 1000);
                         }
                     }
                 });
