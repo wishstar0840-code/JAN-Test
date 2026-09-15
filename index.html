@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>棚割り確認用アプリ JANコード登録 Ver.0.8</title>
+    <!-- バーコード読み取り用ライブラリ (ZXing) -->
+    <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 8px;
+            background-color: #f4f4f9;
+            color: #333;
+            font-size: 0.9rem;
+        }
+        h1 {
+            font-size: 1rem;
+            text-align: center;
+            margin: 4px 0 8px 0;
+        }
+        /* コンパクト化のためのレイアウト */
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .card {
+            background: #fff;
+            padding: 10px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        /* カメラ映像をコンパクトに制限 */
+        .camera-box {
+            position: relative;
+            text-align: center;
+        }
+        video {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 4px;
+            background: #000;
+            display: block;
+        }
+        button {
+            width: 100%;
+            padding: 8px;
+            margin-top: 6px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button.success { background-color: #28a745; margin-top: 4px; }
+        button.danger { background-color: #dc3545; padding: 4px; font-size: 0.8rem; margin-top: 4px; }
+        
+        .form-row {
+            display: flex;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .form-group {
+            flex: 1;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            font-size: 0.8rem;
+            margin-bottom: 2px;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 6px;
+            box-sizing: border-box;
+            font-size: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .status-area {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+        }
+        .log-area {
+            font-size: 0.75rem;
+            height: 60px;
+            overflow-y: auto;
+            background: #e9ecef;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        .action-row {
+            display: flex;
+            gap: 6px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>棚割り確認用アプリ JANコード登録 Ver.0.8</h1>
+
+    <div class="container">
+        <!-- カメラ＆スキャン -->
+        <div class="card" style="padding: 8px;">
+            <video id="video" autoplay muted playsinline></video>
+            <button id="start-btn">カメラ起動 / スキャン開始</button>
+        </div>
+
+        <!-- 入力フォーム（カメラの直下に配置） -->
+        <div class="card">
+            <form id="entry-form">
+                <div>
+                    <label>JANコード:</label>
+                    <input type="text" id="jan" placeholder="バーコード読取 or 手入力" required>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>フェース:</label>
+                        <!-- 初期値なし(空欄) -->
+                        <input type="number" id="face" placeholder="" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>段数:</label>
+                        <!-- 段数は1をデフォルトにしつつ変更可能 -->
+                        <input type="number" id="shelf" value="1" min="1" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="success">データを追加する</button>
+            </form>
+        </div>
+
+        <!-- 蓄積データとCSV出力 -->
+        <div class="card" style="padding: 8px;">
+            <div class="status-area">
+                <span>蓄積データ: <b id="count">0</b>件</span>
+                <button type="button" id="clear-btn" class="danger" style="width: auto; width: 80px;">クリア</button>
+            </div>
+            <div class="log-area" id="log">まだデータがありません</div>
+            <button id="export-btn" style="background-color: #17a2b8; margin-top: 6px;">CSVファイルを保存する</button>
+        </div>
+    </div>
+
+    <script>
+        let codeReader = new ZXing.BrowserBarcodeReader();
+        let scannedData = [];
+        let isScanning = false;
+
+        const videoElement = document.getElementById('video');
+        const startBtn = document.getElementById('start-btn');
+        const janInput = document.getElementById('jan');
+        const faceInput = document.getElementById('face');
+        const shelfInput = document.getElementById('shelf');
+        const form = document.getElementById('entry-form');
+        const logDiv = document.getElementById('log');
+        const countSpan = document.getElementById('count');
+
+        // カメラ起動＆スキャン
+        startBtn.addEventListener('click', () => {
+            if (isScanning) {
+                codeReader.reset();
+                isScanning = false;
+                startBtn.textContent = "カメラ起動 / スキャン開始";
+                return;
+            }
+
+            codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
+                if (result) {
+                    janInput.value = result.text;
+                    // バイブレーション
+                    if (navigator.vibrate) navigator.vibrate(100);
+                    // JANを読み込んだらフェース入力欄にフォーカスをあわせる
+                    faceInput.focus();
+                }
+            }).then(() => {
+                isScanning = true;
+                startBtn.textContent = "スキャン停止";
+            }).catch(err => {
+                console.error(err);
+                alert("カメラの起動に失敗しました。権限を確認してください。");
+            });
+        });
+
+        // データ追加
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const jan = janInput.value.trim();
+            const face = faceInput.value;
+            const shelf = shelfInput.value;
+
+            if (!jan || !face) return;
+
+            scannedData.push({ jan, face, shelf });
+            updateLog();
+
+            // 登録したらJANコードとフェースを空欄にして、次へ備える
+            janInput.value = '';
+            faceInput.value = '';
+            // 段数は連続して同じ段数を登録することが多いためそのまま、必要なら変更してもらう
+            
+            janInput.focus();
+        });
+
+        // ログ更新
+        function updateLog() {
+            countSpan.textContent = scannedData.length;
+            if (scannedData.length === 0) {
+                logDiv.innerHTML = "まだデータがありません";
+                return;
+            }
+            let html = "";
+            scannedData.forEach((item, index) => {
+                html += `${index + 1}: [JAN:${item.jan}] F:${item.face} / 段:${item.shelf}<br>`;
+            });
+            logDiv.innerHTML = html;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // CSV保存
+        document.getElementById('export-btn').addEventListener('click', () => {
+            if (scannedData.length === 0) {
+                alert("保存するデータがありません。");
+                return;
+            }
+
+            let csvContent = '\uFEFFJANコード,フェース,段数\n';
+            scannedData.forEach(item => {
+                csvContent += `"${item.jan}",${item.face},${item.shelf}\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            
+            const now = new Date();
+            const timestamp = now.toISOString().slice(0,10).replace(/-/g,'') + '_' + now.toTimeString().slice(0,5).replace(/:/g,'');
+            
+            a.href = url;
+            a.download = `tanowari_${timestamp}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+
+        // クリア
+        document.getElementById('clear-btn').デザイン = ... // styleはHTML内
+        document.getElementById('clear-btn').addEventListener('click', () => {
+            if (confirm("蓄積したデータをすべて削除しますか？")) {
+                scannedData = [];
+                updateLog();
+            }
+        });
+    </script>
+</body>
+</html>
