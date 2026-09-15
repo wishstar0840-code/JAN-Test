@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>棚割り確認用アプリ JANコード登録 Ver.0.8.4</title>
+    <title>棚割り確認用アプリ JANコード登録 Ver.0.9.0</title>
     <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest"></script>
     <style>
         body {
@@ -32,7 +32,7 @@
             border-radius: 4px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
-        /* カメラ映像およびキャプチャ表示用 */
+        /* カメラ映像およびキャプチャ表示用（ズレ防止のためcontainに変更して全体を表示） */
         .video-container {
             position: relative;
             width: 100%;
@@ -40,18 +40,23 @@
             background: #000;
             border-radius: 4px;
             overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         video, canvas {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
             display: block;
         }
         canvas {
             position: absolute;
             top: 0;
             left: 0;
-            display: none; /* 読み取り時にキャプチャ画像を表示するため初期は非表示 */
+            width: 100%;
+            height: 100%;
+            display: none;
         }
         button {
             padding: 6px;
@@ -95,7 +100,6 @@
             border: 1px solid #ccc;
             border-radius: 4px;
         }
-        /* キーボードを出さないためのセレクトボックス（ドロップダウン）デザイン */
         select {
             width: 100%;
             padding: 5px;
@@ -124,7 +128,7 @@
 </head>
 <body>
 
-    <h1>棚割り確認用アプリ JANコード登録 Ver.0.8.4</h1>
+    <h1>棚割り確認用アプリ JANコード登録 Ver.0.9.0</h1>
 
     <div class="container">
         <!-- カメラ＆スキャン / キャプチャ画像表示エリア -->
@@ -147,7 +151,6 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>フェース:</label>
-                        <!-- キーボードが出ないドロップダウン（1〜10まで選択可能） -->
                         <select id="face">
                             <option value="1" selected>1</option>
                             <option value="2">2</option>
@@ -163,7 +166,6 @@
                     </div>
                     <div class="form-group">
                         <label>段数:</label>
-                        <!-- キーボードが出ないドロップダウン（1〜5まで選択可能） -->
                         <select id="shelf">
                             <option value="1" selected>1段</option>
                             <option value="2">2段</option>
@@ -174,7 +176,6 @@
                     </div>
                 </div>
 
-                <!-- 追加ボタンと、左側の赤いJANクリアボタン -->
                 <div class="action-buttons">
                     <button type="button" id="jan-clear-btn" class="btn-red">JANクリア</button>
                     <button type="submit" class="btn-green">追加</button>
@@ -216,7 +217,6 @@
         async function startScanning() {
             if (!codeReader) return;
             
-            // 再開時はスナップショットを隠して動画を表示
             canvasElement.style.display = 'none';
             videoElement.style.display = 'block';
 
@@ -227,18 +227,21 @@
                 await codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
                     if (result) {
                         if (!janInput.value) {
-                            // 1. 読み取った瞬間に映像をcanvasにキャプチャして静止画として表示（ラグ演出＋確認用）
+                            // 実際のカメラ解像度を取得してキャンバスに正しく描画
+                            const videoWidth = videoElement.videoWidth || 640;
+                            const videoHeight = videoElement.videoHeight || 480;
+                            
+                            canvasElement.width = videoWidth;
+                            canvasElement.height = videoHeight;
                             const context = canvasElement.getContext('2d');
-                            canvasElement.width = videoElement.videoWidth || 300;
-                            canvasElement.height = videoElement.videoHeight || 150;
-                            context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+                            context.drawImage(videoElement, 0, 0, videoWidth, videoHeight);
                             
                             videoElement.style.display = 'none';
                             canvasElement.style.display = 'block';
 
                             if (navigator.vibrate) navigator.vibrate(100);
 
-                            // 2. 約0.6秒の「ラグ（余韻）」を持たせてからJANを確定してストップ
+                            // ラグを持たせてからJAN確定
                             setTimeout(() => {
                                 janInput.value = result.text;
                                 codeReader.reset();
@@ -255,7 +258,6 @@
             }
         }
 
-        // カメラ起動ボタン
         startBtn.addEventListener('click', async () => {
             if (isScanning) {
                 codeReader.reset();
@@ -268,11 +270,9 @@
             }
         });
 
-        // JANクリアボタン
         document.getElementById('jan-clear-btn').addEventListener('click', () => {
             janInput.value = '';
             faceSelect.value = '1';
-            // スナップショットを消してカメラを復帰
             canvasElement.style.display = 'none';
             videoElement.style.display = 'block';
             if (!isScanning) {
@@ -280,7 +280,6 @@
             }
         });
 
-        // データ追加
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             const jan = janInput.value.trim();
@@ -295,16 +294,13 @@
             scannedData.push({ jan, face, shelf });
             updateLog();
 
-            // リセット
             janInput.value = '';
             faceSelect.value = '1';
             
-            // スナップショットを消してカメラを復帰し、一番上へ
             canvasElement.style.display = 'none';
             videoElement.style.display = 'block';
             window.scrollTo({ top: 0, behavior: 'smooth' });
 
-            // 次の読み取りのためにスキャンを自動再開
             setTimeout(() => {
                 startScanning();
             }, 300);
