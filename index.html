@@ -3,38 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>棚割り確認用アプリ JANコード登録 Ver.0.8</title>
+    <title>棚割り確認用アプリ JANコード登録 Ver.0.9</title>
     <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest"></script>
     <style>
         body {
             font-family: sans-serif;
             margin: 0;
-            padding: 8px;
+            padding: 4px;
             background-color: #f4f4f9;
             color: #333;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
         }
         h1 {
-            font-size: 1rem;
+            font-size: 0.95rem;
             text-align: center;
-            margin: 4px 0 8px 0;
+            margin: 2px 0 4px 0;
         }
         .container {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 4px;
             max-width: 500px;
             margin: 0 auto;
         }
         .card {
             background: #fff;
-            padding: 10px;
-            border-radius: 6px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 6px 8px;
+            border-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
+        /* カメラ映像をさらにコンパクトにして、スクロールを完全になくす */
         video {
             width: 100%;
-            height: 120px;
+            height: 90px;
             object-fit: cover;
             border-radius: 4px;
             background: #000;
@@ -42,9 +43,9 @@
         }
         button {
             width: 100%;
-            padding: 8px;
-            margin-top: 6px;
-            font-size: 0.95rem;
+            padding: 6px;
+            margin-top: 4px;
+            font-size: 0.9rem;
             font-weight: bold;
             color: #fff;
             background-color: #007bff;
@@ -53,12 +54,12 @@
             cursor: pointer;
         }
         button.success { background-color: #28a745; margin-top: 4px; }
-        button.danger { background-color: #dc3545; padding: 4px; font-size: 0.8rem; margin-top: 4px; width: 80px; }
+        button.danger { background-color: #dc3545; padding: 2px 4px; font-size: 0.75rem; width: 60px; }
         
         .form-row {
             display: flex;
-            gap: 6px;
-            margin-top: 6px;
+            gap: 4px;
+            margin-top: 4px;
         }
         .form-group {
             flex: 1;
@@ -66,14 +67,14 @@
         label {
             display: block;
             font-weight: bold;
-            font-size: 0.8rem;
-            margin-bottom: 2px;
+            font-size: 0.75rem;
+            margin-bottom: 1px;
         }
         input[type="text"], input[type="number"] {
             width: 100%;
-            padding: 6px;
+            padding: 4px;
             box-sizing: border-box;
-            font-size: 1rem;
+            font-size: 0.95rem;
             border: 1px solid #ccc;
             border-radius: 4px;
         }
@@ -81,26 +82,26 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 0.8rem;
-            margin-bottom: 4px;
+            font-size: 0.75rem;
+            margin-bottom: 2px;
         }
         .log-area {
-            font-size: 0.75rem;
-            height: 60px;
+            font-size: 0.7rem;
+            height: 45px;
             overflow-y: auto;
             background: #e9ecef;
-            padding: 4px;
+            padding: 2px 4px;
             border-radius: 4px;
         }
     </style>
 </head>
 <body>
 
-    <h1>棚割り確認用アプリ JANコード登録 Ver.0.8</h1>
+    <h1>棚割り確認用アプリ JANコード登録 Ver.0.9</h1>
 
     <div class="container">
         <!-- カメラ＆スキャン -->
-        <div class="card" style="padding: 8px;">
+        <div class="card" id="camera-card">
             <video id="video" autoplay muted playsinline></video>
             <button id="start-btn">カメラ起動 / スキャン開始</button>
         </div>
@@ -124,18 +125,18 @@
                     </div>
                 </div>
 
-                <button type="submit" class="success">データを追加する</button>
+                <button type="submit" class="success">データを追加する（次へ）</button>
             </form>
         </div>
 
         <!-- 蓄積データとCSV出力 -->
-        <div class="card" style="padding: 8px;">
+        <div class="card">
             <div class="status-area">
                 <span>蓄積データ: <b id="count">0</b>件</span>
                 <button type="button" id="clear-btn" class="danger">クリア</button>
             </div>
             <div class="log-area" id="log">まだデータがありません</div>
-            <button id="export-btn" style="background-color: #17a2b8; margin-top: 6px;">CSVファイルを保存する</button>
+            <button id="export-btn" style="background-color: #17a2b8; margin-top: 4px; padding: 5px;">CSVファイルを保存する</button>
         </div>
     </div>
 
@@ -149,6 +150,7 @@
         });
 
         const startBtn = document.getElementById('start-btn');
+        const cameraCard = document.getElementById('camera-card');
         const janInput = document.getElementById('jan');
         const faceInput = document.getElementById('face');
         const shelfInput = document.getElementById('shelf');
@@ -178,14 +180,14 @@
                     if (result) {
                         janInput.value = result.text;
                         if (navigator.vibrate) navigator.vibrate(100);
-                        faceInput.focus();
+                        faceInput.focus(); // 読み取ったらフェースへフォーカス
                     }
                 });
             } catch (err) {
                 console.error(err);
                 isScanning = false;
                 startBtn.textContent = "カメラ起動 / スキャン開始";
-                alert("カメラを起動できませんでした。ブラウザのカメラ権限（アクセス許可）を確認してください。");
+                alert("カメラを起動できませんでした。ブラウザのカメラ権限を確認してください。");
             }
         });
 
@@ -193,7 +195,7 @@
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             const jan = janInput.value.trim();
-            const face = faceInput.value.trim() === '' ? '1' : faceInput.value.trim(); // 空欄ならデフォルト1にするなど柔軟に
+            const face = faceInput.value.trim() === '' ? '1' : faceInput.value.trim();
             const shelf = shelfInput.value;
 
             if (!jan) {
@@ -204,10 +206,15 @@
             scannedData.push({ jan, face, shelf });
             updateLog();
 
-            // リセット
+            // ★ここがポイント：登録ボタンを押した瞬間に入力欄からフォーカスを外し、キーボードを強制的に閉じる
+            document.activeElement.blur();
+
+            // リセットしてカメラ画面が見える位置に視点を戻す
             janInput.value = '';
             faceInput.value = '';
-            janInput.focus();
+            
+            // 画面の一番上（カメラ部分）にスクロールを強制的に戻す
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         });
 
         function updateLog() {
