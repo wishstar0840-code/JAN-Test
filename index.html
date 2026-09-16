@@ -2,8 +2,9 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>棚割り確認用アプリ JANコード登録 Ver.1.0.4</title>
+    <!-- キーボード表示時の勝手なズームや画面切れを防ぐ設定 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>棚割り確認用アプリ JANコード登録 Ver.1.0.5</title>
     <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest"></script>
     <style>
         body {
@@ -91,19 +92,20 @@
             font-size: 0.75rem;
             margin-bottom: 1px;
         }
+        /* 自動ズームを防ぐためフォントサイズを16px以上に指定 */
         input[type="text"] {
             width: 100%;
-            padding: 4px;
+            padding: 5px 4px;
             box-sizing: border-box;
-            font-size: 0.9rem;
+            font-size: 16px; 
             border: 1px solid #ccc;
             border-radius: 4px;
         }
         select {
             width: 100%;
-            padding: 5px 2px;
+            padding: 6px 2px;
             box-sizing: border-box;
-            font-size: 0.9rem;
+            font-size: 16px;
             border: 1px solid #ccc;
             border-radius: 4px;
             background-color: #fff;
@@ -128,7 +130,7 @@
 </head>
 <body>
 
-    <h1>棚割り確認用アプリ JANコード登録 Ver.1.0.4</h1>
+    <h1>棚割り確認用アプリ JANコード登録 Ver.1.0.5</h1>
 
     <div class="container">
         <!-- 店舗情報・カテゴリ入力エリア -->
@@ -407,11 +409,9 @@
             const url = URL.createObjectURL(blobCsv);
             const a = document.createElement('a');
             
-            // 店舗名とカテゴリを取得（未入力の場合はデフォルト文字列に）
             const store = storeInput.value.trim() ? storeInput.value.trim() : '店舗未入力';
             const category = categoryInput.value.trim() ? categoryInput.value.trim() : 'カテゴリ未入力';
             
-            // ファイル名に使えない文字が含まれている場合の簡易置換
             const safeStore = store.replace(/[\/\\?%*:|"<>]/g, '_');
             const safeCategory = category.replace(/[\/\\?%*:|"<>]/g, '_');
 
