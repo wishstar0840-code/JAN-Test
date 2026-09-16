@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>棚割り確認用アプリ JANコード登録 Ver.1.0.1</title>
+    <title>棚割り確認用アプリ JANコード登録 Ver.1.0.2</title>
     <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest"></script>
     <style>
         body {
@@ -128,7 +128,7 @@
 </head>
 <body>
 
-    <h1>棚割り確認用アプリ JANコード登録 Ver.1.0.1</h1>
+    <h1>棚割り確認用アプリ JANコード登録 Ver.1.0.2</h1>
 
     <div class="container">
         <!-- カメラ＆スキャン / キャプチャ画像表示エリア -->
@@ -220,6 +220,10 @@
         let scannedData = [];
         let isScanning = false;
 
+        // 段数ごとの位置カウンターを管理するオブジェクト（例: { "1": 1, "2": 1, ... }）
+        let positionCounters = {};
+        let currentShelf = "1";
+
         window.addEventListener('load', () => {
             codeReader = new ZXing.BrowserBarcodeReader();
         });
@@ -234,6 +238,11 @@
         const form = document.getElementById('entry-form');
         const logDiv = document.getElementById('log');
         const countSpan = document.getElementById('count');
+
+        // 段数が切り替わったときに位置を1にリセット、または既存のカウンターを適用
+        shelfSelect.addEventListener('change', () => {
+            currentShelf = shelfSelect.value;
+        });
 
         // スキャン処理の関数
         async function startScanning() {
@@ -293,7 +302,6 @@
 
         document.getElementById('jan-clear-btn').addEventListener('click', () => {
             janInput.value = '';
-            // フェース、段数、台目は前回の値をそのまま保持
             canvasElement.style.display = 'none';
             videoElement.style.display = 'block';
             if (!isScanning) {
@@ -313,7 +321,23 @@
                 return;
             }
 
-            scannedData.push({ jan, face, shelf, daime });
+            // --- 位置の自動カウント処理 ---
+            // もし段数が変更されていたら、その段数のカウンターを初期化（または取得）
+            if (currentShelf !== shelf) {
+                currentShelf = shelf;
+            }
+            if (!positionCounters[shelf]) {
+                positionCounters[shelf] = 1;
+            }
+            const position = positionCounters[shelf];
+            
+            // 次回のために位置を+1する（最大50まで。超えたら50で止めるなどの安全策）
+            if (positionCounters[shelf] < 50) {
+                positionCounters[shelf]++;
+            }
+            // ---------------------------
+
+            scannedData.push({ jan, face, shelf, daime, position });
             updateLog();
 
             // JANのみクリアし、フェース・段数・台目の値は維持
@@ -336,7 +360,7 @@
             }
             let html = "";
             scannedData.forEach((item, index) => {
-                html += `${index + 1}: [JAN:${item.jan}] F:${item.face} / 段:${item.shelf} / ${item.daime}台目<br>`;
+                html += `${index + 1}: [JAN:${item.jan}] 台:${item.daime} / 段:${item.shelf} / 位置:${item.position} / F:${item.face}<br>`;
             });
             logDiv.innerHTML = html;
             logDiv.scrollTop = logDiv.scrollHeight;
@@ -348,14 +372,15 @@
                 return;
             }
 
-            // CSVのヘッダーに台目を追加
-            let csvContent = '\uFEFFJANコード,フェース,段数,台目\n';
+            // ご要望の順序: 「台目	段数	位置	フェース	JANコード」
+            let csvContent = '\uFEFF台目,段数,位置,フェース,JANコード\n';
             scannedData.forEach(item => {
-                csvContent += `"${item.jan}",${item.face},${item.shelf},${item.daime}\n`;
+                csvContent += `${item.daime},${item.shelf},${item.position},${item.face},"${item.jan}"\n`;
             });
 
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
+            const blob = new Blob([csvContent], { type: 'text/css;charset=utf-8;' }); // ※修正: csvに変更
+            const blobCsv = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blobCsv);
             const a = document.createElement('a');
             
             const now = new Date();
@@ -371,6 +396,7 @@
         document.getElementById('clear-all-btn').addEventListener('click', () => {
             if (confirm("蓄積したデータをすべて削除しますか？")) {
                 scannedData = [];
+                positionCounters = {}; // カウントもリセット
                 updateLog();
             }
         });
