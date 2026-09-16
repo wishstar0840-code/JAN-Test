@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>棚割り確認用アプリ JANコード登録 Ver.1.0.2</title>
+    <title>棚割り確認用アプリ JANコード登録 Ver.1.0.4</title>
     <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest"></script>
     <style>
         body {
@@ -95,7 +95,7 @@
             width: 100%;
             padding: 4px;
             box-sizing: border-box;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             border: 1px solid #ccc;
             border-radius: 4px;
         }
@@ -128,9 +128,23 @@
 </head>
 <body>
 
-    <h1>棚割り確認用アプリ JANコード登録 Ver.1.0.2</h1>
+    <h1>棚割り確認用アプリ JANコード登録 Ver.1.0.4</h1>
 
     <div class="container">
+        <!-- 店舗情報・カテゴリ入力エリア -->
+        <div class="card">
+            <div class="form-row" style="margin-top: 0;">
+                <div class="form-group">
+                    <label>店舗名:</label>
+                    <input type="text" id="store-name" placeholder="例: 青森店">
+                </div>
+                <div class="form-group">
+                    <label>カテゴリ:</label>
+                    <input type="text" id="category-name" placeholder="例: 飲料">
+                </div>
+            </div>
+        </div>
+
         <!-- カメラ＆スキャン / キャプチャ画像表示エリア -->
         <div class="card" id="camera-card">
             <div class="video-container">
@@ -199,6 +213,7 @@
 
                 <div class="action-buttons">
                     <button type="button" id="jan-clear-btn" class="btn-red">JANクリア</button>
+                    <button type="button" id="undo-btn" class="btn-red" style="background-color: #d9534f;">直前を取消</button>
                     <button type="submit" class="btn-green">追加</button>
                 </div>
             </form>
@@ -220,7 +235,6 @@
         let scannedData = [];
         let isScanning = false;
 
-        // 段数ごとの位置カウンターを管理するオブジェクト（例: { "1": 1, "2": 1, ... }）
         let positionCounters = {};
         let currentShelf = "1";
 
@@ -235,16 +249,16 @@
         const faceSelect = document.getElementById('face');
         const shelfSelect = document.getElementById('shelf');
         const daimeSelect = document.getElementById('daime');
+        const storeInput = document.getElementById('store-name');
+        const categoryInput = document.getElementById('category-name');
         const form = document.getElementById('entry-form');
         const logDiv = document.getElementById('log');
         const countSpan = document.getElementById('count');
 
-        // 段数が切り替わったときに位置を1にリセット、または既存のカウンターを適用
         shelfSelect.addEventListener('change', () => {
             currentShelf = shelfSelect.value;
         });
 
-        // スキャン処理の関数
         async function startScanning() {
             if (!codeReader) return;
             
@@ -271,7 +285,6 @@
 
                             if (navigator.vibrate) navigator.vibrate(100);
 
-                            // 1秒のラグを持たせてJAN確定
                             setTimeout(() => {
                                 janInput.value = result.text;
                                 codeReader.reset();
@@ -309,6 +322,24 @@
             }
         });
 
+        document.getElementById('undo-btn').addEventListener('click', () => {
+            if (scannedData.length === 0) {
+                alert("取消すデータがありません。");
+                return;
+            }
+
+            const lastItem = scannedData.pop();
+            
+            if (positionCounters[lastItem.shelf] && positionCounters[lastItem.shelf] > 1) {
+                positionCounters[lastItem.shelf]--;
+            } else {
+                positionCounters[lastItem.shelf] = 1;
+            }
+
+            updateLog();
+            alert(`直前のデータ（JAN: ${lastItem.jan} / 位置: ${lastItem.position}）を取り消しました。`);
+        });
+
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             const jan = janInput.value.trim();
@@ -321,8 +352,6 @@
                 return;
             }
 
-            // --- 位置の自動カウント処理 ---
-            // もし段数が変更されていたら、その段数のカウンターを初期化（または取得）
             if (currentShelf !== shelf) {
                 currentShelf = shelf;
             }
@@ -331,16 +360,13 @@
             }
             const position = positionCounters[shelf];
             
-            // 次回のために位置を+1する（最大50まで。超えたら50で止めるなどの安全策）
             if (positionCounters[shelf] < 50) {
                 positionCounters[shelf]++;
             }
-            // ---------------------------
 
             scannedData.push({ jan, face, shelf, daime, position });
             updateLog();
 
-            // JANのみクリアし、フェース・段数・台目の値は維持
             janInput.value = '';
             
             canvasElement.style.display = 'none';
@@ -372,22 +398,28 @@
                 return;
             }
 
-            // ご要望の順序: 「台目	段数	位置	フェース	JANコード」
             let csvContent = '\uFEFF台目,段数,位置,フェース,JANコード\n';
             scannedData.forEach(item => {
                 csvContent += `${item.daime},${item.shelf},${item.position},${item.face},"${item.jan}"\n`;
             });
 
-            const blob = new Blob([csvContent], { type: 'text/css;charset=utf-8;' }); // ※修正: csvに変更
             const blobCsv = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blobCsv);
             const a = document.createElement('a');
             
+            // 店舗名とカテゴリを取得（未入力の場合はデフォルト文字列に）
+            const store = storeInput.value.trim() ? storeInput.value.trim() : '店舗未入力';
+            const category = categoryInput.value.trim() ? categoryInput.value.trim() : 'カテゴリ未入力';
+            
+            // ファイル名に使えない文字が含まれている場合の簡易置換
+            const safeStore = store.replace(/[\/\\?%*:|"<>]/g, '_');
+            const safeCategory = category.replace(/[\/\\?%*:|"<>]/g, '_');
+
             const now = new Date();
             const timestamp = now.toISOString().slice(0,10).replace(/-/g,'') + '_' + now.toTimeString().slice(0,5).replace(/:/g,'');
             
             a.href = url;
-            a.download = `tanowari_${timestamp}.csv`;
+            a.download = `${safeStore}_${safeCategory}_${timestamp}.csv`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -396,7 +428,7 @@
         document.getElementById('clear-all-btn').addEventListener('click', () => {
             if (confirm("蓄積したデータをすべて削除しますか？")) {
                 scannedData = [];
-                positionCounters = {}; // カウントもリセット
+                positionCounters = {};
                 updateLog();
             }
         });
